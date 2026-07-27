@@ -213,10 +213,10 @@ fn pad(text: &str, width: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data::parse;
+    use crate::data::parse_csv;
 
     fn sample() -> Table {
-        parse(b"id,notes\n1,short\n2,\"a\nb\"\n", b',', "test").expect("parse failed")
+        parse_csv(b"id,notes\n1,short\n2,\"a\nb\"\n", "test").expect("parse failed")
     }
 
     #[test]
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn column_widths_cover_the_header() {
-        let table = parse(b"a_very_long_header_name\nx\n", b',', "t").expect("parse failed");
+        let table = parse_csv(b"a_very_long_header_name\nx\n", "t").expect("parse failed");
         let widths = column_widths(&table);
         assert!(widths[0] >= MIN_COLUMN);
     }

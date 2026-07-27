@@ -1,76 +1,9 @@
-//! Loading CSV data into memory.
+//! Separated-value parsing.
 //!
-//! Parsing is a pure function from bytes to a [`Table`]; only [`load`] touches
-//! the filesystem. Malformed input never fails the load — ragged rows are
-//! reconciled against the header and recorded as [`LoadWarning`]s.
+//! Unchanged from the original CSV path: malformed input never fails the load,
+//! it is reconciled against the header and recorded as a warning.
 
-use std::fs::File;
-use std::io::{self, Read};
-use std::path::Path;
-
-/// Why a row needed reconciling against the header.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WarningKind {
-    /// Row had fewer fields than the header; padded with empties.
-    Short { got: usize, want: usize },
-    /// Row had more fields than the header; surplus columns were synthesised.
-    Long { got: usize, want: usize },
-    /// Row contained bytes that are not valid UTF-8; replaced lossily.
-    InvalidUtf8,
-}
-
-impl WarningKind {
-    /// Human-readable explanation, for the help overlay.
-    pub fn describe(self) -> String {
-        match self {
-            Self::Short { got, want } => format!("{got} fields, expected {want} (padded)"),
-            Self::Long { got, want } => format!("{got} fields, expected {want} (surplus kept)"),
-            Self::InvalidUtf8 => "invalid UTF-8 (replaced)".to_owned(),
-        }
-    }
-}
-
-/// A problem found while loading one row.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LoadWarning {
-    /// One-based data row number, matching what the UI displays.
-    pub row: usize,
-    pub kind: WarningKind,
-}
-
-/// A whole CSV file held in memory.
-#[derive(Debug, Clone, Default)]
-pub struct Table {
-    pub headers: Vec<String>,
-    pub rows: Vec<Vec<String>>,
-    pub warnings: Vec<LoadWarning>,
-    /// Display name for the status bar.
-    pub name: String,
-}
-
-impl Table {
-    /// Number of data rows, excluding the header.
-    pub fn len(&self) -> usize {
-        self.rows.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
-    }
-
-    /// Number of columns, after reconciling every row against the header.
-    pub fn width(&self) -> usize {
-        self.headers.len()
-    }
-
-    /// Raw text of one field, or `""` when either index is out of range.
-    pub fn field(&self, row: usize, col: usize) -> &str {
-        self.rows
-            .get(row)
-            .and_then(|r| r.get(col))
-            .map_or("", String::as_str)
-    }
-}
+use super::{LoadWarning, Table, WarningKind};
 
 /// Parse CSV bytes into a [`Table`].
 ///
@@ -158,27 +91,10 @@ pub fn parse(data: &[u8], delimiter: u8, name: &str) -> Result<Table, csv::Error
     })
 }
 
-/// Read a CSV file, or standard input when `path` is `None` or `-`.
-pub fn load(path: Option<&Path>, delimiter: u8) -> io::Result<Table> {
-    let mut data = Vec::new();
-    let name = match path {
-        Some(p) if p != Path::new("-") => {
-            File::open(p)?.read_to_end(&mut data)?;
-            p.file_name()
-                .map_or_else(|| p.display().to_string(), |n| n.to_string_lossy().into())
-        }
-        _ => {
-            io::stdin().read_to_end(&mut data)?;
-            "<stdin>".to_owned()
-        }
-    };
-
-    parse(&data, delimiter, &name).map_err(io::Error::other)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::data::{LoadWarning, WarningKind};
 
     fn table(csv: &str) -> Table {
         parse(csv.as_bytes(), b',', "test").expect("parse failed")

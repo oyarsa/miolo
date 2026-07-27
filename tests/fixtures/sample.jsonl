@@ -1,0 +1,5 @@
+{"order_id": "8f3a91c2", "customer": "Ada Lovelace", "notes": "Customer called about the delayed shipment.\n\nFollow-up: offered a partial refund (20%), declined.", "total_cents": 12995, "items": [{"sku": "AB-12", "qty": 2}, {"sku": "CD-34", "qty": 1}]}
+this line is not json at all
+{"order_id": "2b1d77aa", "customer": "山田太郎 🎌", "notes": "配送が遅れています。", "total_cents": 8990, "shipped_at": null}
+[1, 2, 3]
+{"order_id": "0aa71c33", "customer": "Kai Nakamura", "notes": "", "total_cents": 3100, "metadata": {"channel": "web", "flags": ["priority", "gift"]}}

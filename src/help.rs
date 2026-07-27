@@ -104,11 +104,11 @@ pub fn content(table: &Table) -> Vec<HelpLine> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data::parse;
+    use crate::data::parse_csv;
 
     #[test]
     fn lists_every_section() {
-        let table = parse(b"a\n1\n", b',', "t").expect("parse failed");
+        let table = parse_csv(b"a\n1\n", "t").expect("parse failed");
         let sections: Vec<_> = content(&table)
             .into_iter()
             .filter_map(|l| match l {
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn appends_load_warnings() {
-        let table = parse(b"a,b\n1\n", b',', "t").expect("parse failed");
+        let table = parse_csv(b"a,b\n1\n", "t").expect("parse failed");
         let lines = content(&table);
         assert!(lines.contains(&HelpLine::Section("Load warnings")));
         assert!(
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn clean_files_have_no_warning_section() {
-        let table = parse(b"a,b\n1,2\n", b',', "t").expect("parse failed");
+        let table = parse_csv(b"a,b\n1,2\n", "t").expect("parse failed");
         assert!(!content(&table).contains(&HelpLine::Section("Load warnings")));
     }
 
@@ -143,7 +143,7 @@ mod tests {
         for _ in 0..(MAX_LISTED_WARNINGS + 10) {
             csv.push_str("1\n");
         }
-        let table = parse(csv.as_bytes(), b',', "t").expect("parse failed");
+        let table = parse_csv(csv.as_bytes(), "t").expect("parse failed");
         let lines = content(&table);
         let listed = lines
             .iter()

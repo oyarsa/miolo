@@ -169,6 +169,12 @@ Rules:
 | 8 Sam Okonkwo | Empty `notes` — must render `(empty)` |
 | 9 Long Field Test | 60 numbered lines |
 
+There are companion fixtures for the other formats: `sample.json` (nested
+objects and arrays, a `null`, CJK), `sample.jsonl` (with one unparseable line
+and one non-object line, so the warning path is always exercised), and
+`sample.csv.gz` / `sample.csv.zst` (byte-identical to `sample.csv`, so any
+difference in what they render is a decompression bug).
+
 Row 9 exists so scroll position is verifiable at a glance: if the screen shows
 `line 023` at the top, the viewport is unambiguous without counting rows. Use
 it whenever checking `^d`/`^u`, `z`, `g`/`G`, or pager scrolling.

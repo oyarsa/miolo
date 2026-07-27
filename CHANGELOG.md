@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- JSON input: a top-level array of objects, with columns taken from the union
+  of every object's keys
+- JSONL / NDJSON input, one object per line
+- gzip and zstd decompression, detected from the file's leading bytes rather
+  than its name, so compressed input works over a pipe and survives a
+  misleading filename
+- `--format` to state the input format, principally for stdin
+- Format inferred from the file extension, including through a compression
+  suffix such as `.jsonl.zst`
+- `.psv` recognised as pipe-separated
+- Nested JSON values are pretty-printed and tinted in the pager
+
+### Changed
+
+- `--delimiter` no longer defaults eagerly; it is only applied when given, so
+  it can refine a format rather than override one
+
 ## [0.1.0] - 2026-07-27
 
 ### Added

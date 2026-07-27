@@ -99,7 +99,7 @@ stored, so a large CSV pays nothing for this feature.
 | JSON value | Rendered as |
 | --- | --- |
 | string | the string itself, unquoted |
-| number | the source token, exactly |
+| number | its digits, verbatim |
 | `true` / `false` | `true` / `false` |
 | `null` | empty — shown as `(empty)` |
 | absent key | empty — shown as `(empty)` |
@@ -109,8 +109,11 @@ stored, so a large CSV pays nothing for this feature.
 Distinguishing them would need a per-cell kind on every cell in every file,
 which is not worth a third more memory on a large CSV.
 
-Numbers preserve their source token — `1.0` does not become `1`, and a large
-integer does not lose digits — via `serde_json`'s `arbitrary_precision`.
+Numbers keep their digits via `serde_json`'s `arbitrary_precision`: `1.0` does
+not become `1`, a large integer loses nothing, and a value with more precision
+than an `f64` could hold survives intact. The one normalisation is exponent
+notation, where the marker is lowercased and given an explicit sign — `1e3` and
+`1E3` both render as `1e+3`. The value is unchanged.
 
 Nested values pretty-print and then behave like any other tall field, which is
 exactly what the record view exists for. The pager tints them as code, detected

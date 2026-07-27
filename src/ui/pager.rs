@@ -6,7 +6,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
 use crate::data::Table;
-use crate::markdown::{Segment, classify, has_fence};
+use crate::markdown::{Segment, classify, has_fence, looks_structured};
 use crate::state::{State, Viewport, pager_view};
 use crate::ui::{Theme, footer, justify, split, thousands};
 
@@ -73,10 +73,15 @@ pub fn status_bar(
 /// The visible slice of the field, with fenced blocks tinted.
 pub fn body(state: &State, table: &Table, view: Viewport, theme: Theme) -> Vec<Line<'static>> {
     let lines = pager_view(state, table, view);
-    // Most fields are plain prose; skip the fence walk entirely for those.
-    let segments = if has_fence(state.pager_text(table)) {
+    let raw = state.pager_text(table);
+    let segments = if has_fence(raw) {
         classify(&lines)
+    } else if looks_structured(raw) {
+        // A nested JSON value: tint the whole field rather than hunting for
+        // fences it will never contain.
+        vec![Segment::Code; lines.len()]
     } else {
+        // Plain prose, which is most fields; skip the walk entirely.
         vec![Segment::Text; lines.len()]
     };
 

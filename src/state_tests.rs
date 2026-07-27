@@ -3,7 +3,7 @@
 //! Split from `state.rs` to keep both files comfortably under the size limit.
 
 use super::*;
-use crate::data::parse;
+use crate::data::parse_csv;
 
 /// The `notes` field is deliberately taller than the test viewport and wider
 /// than half its width, so pager scrolling and horizontal shifting both have
@@ -15,7 +15,7 @@ fn table() -> Table {
         .collect::<Vec<_>>()
         .join("\n");
     let csv = format!("id,notes,total\n1,\"{notes}\",10\n2,short,20\n3,other,30\n");
-    parse(csv.as_bytes(), b',', "test").expect("parse failed")
+    parse_csv(csv.as_bytes(), "test").expect("parse failed")
 }
 
 fn view() -> Viewport {
@@ -142,7 +142,7 @@ fn quit_sets_the_flag() {
 
 #[test]
 fn empty_table_does_not_panic() {
-    let empty = parse(b"a,b\n", b',', "test").expect("parse failed");
+    let empty = parse_csv(b"a,b\n", "test").expect("parse failed");
     let s = update(&start(), &empty, view(), Action::Right);
     assert_eq!(s.row, 0);
 }

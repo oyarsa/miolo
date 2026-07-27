@@ -3,11 +3,11 @@ name = "miolo"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "Terminal viewer for CSV files with long, multi-line text columns"
+description = "Terminal viewer for CSV, TSV, JSON and JSONL with long, multi-line text columns"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/oyarsa/miolo"
 readme = "README.md"
-keywords = ["csv", "tui", "viewer", "terminal", "pager"]
+keywords = ["csv", "json", "tui", "viewer", "terminal"]
 categories = ["command-line-utilities", "text-processing"]
 # Development-only material; keep the published crate to what building needs.
 exclude = [".github/", "scripts/"]
@@ -17,7 +17,10 @@ anyhow = "1.0.104"
 clap = { version = "4.6.4", features = ["derive"] }
 crossterm = { version = "0.29", features = ["use-dev-tty"] }
 csv = "1.4.0"
+flate2 = { version = "1.1.9", default-features = false, features = ["rust_backend"] }
 ratatui = "0.30"
+ruzstd = "0.9.0"
+serde_json = { version = "1.0.151", features = ["preserve_order", "arbitrary_precision"] }
 textwrap = "0.16.2"
 thiserror = "2.0.19"
 unicode-width = "0.2"

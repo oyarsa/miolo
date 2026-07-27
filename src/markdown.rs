@@ -44,6 +44,16 @@ pub fn has_fence(raw: &str) -> bool {
     raw.lines().any(|l| l.trim_start().starts_with(FENCE))
 }
 
+/// Whether a field looks like a structured value rather than prose.
+///
+/// Detected from the text rather than recorded at load time, so no per-cell
+/// type has to be carried through the table. A CSV cell that happens to hold
+/// JSON is tinted too, which is a feature rather than a cost.
+pub fn looks_structured(raw: &str) -> bool {
+    let trimmed = raw.trim_start();
+    (trimmed.starts_with('{') || trimmed.starts_with('[')) && raw.contains('\n')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,6 +93,20 @@ mod tests {
     fn unclosed_fence_runs_to_the_end() {
         let out = classify(&lines("```\na\nb"));
         assert_eq!(out, [Segment::Fence, Segment::Code, Segment::Code]);
+    }
+
+    #[test]
+    fn structured_values_are_recognised() {
+        assert!(looks_structured("{\n  \"a\": 1\n}"));
+        assert!(looks_structured("[\n  1,\n  2\n]"));
+        assert!(looks_structured("  {\n\"a\": 1}"), "leading space is fine");
+    }
+
+    #[test]
+    fn prose_and_one_liners_are_not_structured() {
+        assert!(!looks_structured("just some prose\nover two lines"));
+        assert!(!looks_structured("{\"a\": 1}"), "single line stays plain");
+        assert!(!looks_structured(""));
     }
 
     #[test]

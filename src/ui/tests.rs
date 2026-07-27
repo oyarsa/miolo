@@ -8,21 +8,20 @@
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
-use crate::data::{Table, parse};
+use crate::data::{Table, parse_csv};
 use crate::layout::field_cap;
 use crate::state::{Action, State, Viewport, update};
 use crate::ui::{Context, Theme, render};
 
 /// A fixture with the awkward cases the real sample file exercises.
 fn table() -> Table {
-    parse(
+    parse_csv(
         "id,customer,notes,total\n\
          1,Ada,\"first line\nsecond line\nthird line\nfourth line\",10\n\
          2,\u{5c71}\u{7530},short,20\n\
          3,Bob,,30\n\
          4,Kim,\"   \",40\n"
             .as_bytes(),
-        b',',
         "test.csv",
     )
     .expect("parse failed")
@@ -236,7 +235,7 @@ fn a_tiny_terminal_still_renders() {
 
 #[test]
 fn an_empty_table_renders_without_rows() {
-    let empty = parse(b"a,b\n", b',', "empty.csv").expect("parse failed");
+    let empty = parse_csv(b"a,b\n", "empty.csv").expect("parse failed");
     let lines = frame(&State::new(true), &empty, 40, 6);
     assert!(lines[0].contains("no rows"));
 }

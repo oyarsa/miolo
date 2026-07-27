@@ -1,13 +1,16 @@
-//! miolo — a terminal viewer for CSV files with long, multi-line text columns.
+//! miolo — a terminal viewer for tabular files with long, multi-line text
+//! columns: CSV, TSV, JSON and JSONL, compressed or not.
 
 mod cli;
 mod clipboard;
 mod data;
+mod decompress;
 mod help;
 mod keys;
 mod layout;
 mod markdown;
 mod search;
+mod source;
 mod state;
 mod ui;
 
@@ -39,8 +42,8 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let delimiter = delimiter_byte(cli.delimiter)?;
-    let table = data::load(cli.file.as_deref(), delimiter).context("failed to read input")?;
+    let delimiter = cli.delimiter.map(delimiter_byte).transpose()?;
+    let table = data::load(cli.file.as_deref(), cli.format, delimiter)?;
     let theme = Theme::new(!cli.no_color && std::env::var_os("NO_COLOR").is_none());
 
     let mut terminal = setup().context("failed to set up the terminal")?;
@@ -49,7 +52,7 @@ fn main() -> Result<()> {
     outcome
 }
 
-/// A delimiter has to be a single byte for the CSV reader.
+/// A delimiter has to be a single byte for the separated-value reader.
 fn delimiter_byte(delimiter: char) -> Result<u8> {
     let mut buf = [0u8; 4];
     let encoded = delimiter.encode_utf8(&mut buf);
