@@ -245,8 +245,8 @@ pub fn build_body(
 ) -> Vec<BodyLine> {
     let mut body = Vec::new();
     for (index, name) in headers.iter().enumerate() {
-        let raw = row.get(index).map_or("", String::as_str);
-        let layout = layout_field(raw, width, wrap);
+        let cell = row.get(index).map_or("", String::as_str);
+        let layout = layout_field(cell, width, wrap);
         let total = layout.lines.len();
         let limit = if expanded == Some(index) { total } else { cap };
         let shown = total.min(limit);

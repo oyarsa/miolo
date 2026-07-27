@@ -8,7 +8,12 @@ behaviour, and update it in the same commit when behaviour changes.
 ## Before Completing Any Task
 
 1. Run `just fix` (formats code, autofixes clippy warnings, and runs tests)
-2. Commit changes (do NOT bump version or tag unless explicitly asked)
+2. Run `just ci` before pushing — it mirrors the CI workflow exactly
+
+`just fix` uses your default toolchain. CI also builds and tests on the MSRV
+(1.88), where compilation can fail even though a newer toolchain is happy.
+`just ci` catches that; `just fix` alone does not. Do not push on the strength
+of `just fix`.
 
 ## Releasing
 

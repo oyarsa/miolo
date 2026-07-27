@@ -10,13 +10,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
+  # Lints run on stable rather than the MSRV. Clippy's lint set shifts between
+  # releases, and pinning it to the MSRV means conforming to rules the current
+  # toolchain has since dropped. MSRV is still verified, by the test job below.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.88
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
@@ -29,8 +32,28 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Run tests
-        run: cargo test
+  test:
+    name: Test (Rust ${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The first entry must match `rust-version` in Cargo.toml.
+        toolchain: ["1.88", stable]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.toolchain }}
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --locked --all-targets
+
+      - name: Run tests
+        run: cargo test
