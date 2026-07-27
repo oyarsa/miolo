@@ -14,7 +14,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
 use crate::data::Table;
-use crate::layout::display_width;
+use crate::layout::{display_width, truncate_to_width};
 use crate::state::{Mode, State, Viewport};
 
 /// Colours come from the terminal's 16 ANSI slots so the viewer follows the
@@ -100,13 +100,34 @@ impl Theme {
     }
 }
 
+/// Everything the renderer needs that does not change between frames.
+///
+/// Column widths are sampled from the data and cost real time on a large file,
+/// so they are computed once at startup rather than per frame. They depend
+/// only on the table, not on the terminal size, so a resize does not
+/// invalidate them.
+pub struct Context {
+    pub theme: Theme,
+    pub widths: Vec<usize>,
+}
+
+impl Context {
+    pub fn new(theme: Theme, table: &Table) -> Self {
+        Self {
+            theme,
+            widths: table::column_widths(table),
+        }
+    }
+}
+
 /// Draw whichever view is active.
-pub fn render(frame: &mut Frame, state: &State, table: &Table, view: Viewport, theme: Theme) {
+pub fn render(frame: &mut Frame, state: &State, table: &Table, view: Viewport, ctx: &Context) {
     let area = frame.area();
+    let theme = ctx.theme;
     match state.mode {
         Mode::Record => record::render(frame, area, state, table, view, theme),
         Mode::Pager => pager::render(frame, area, state, table, view, theme),
-        Mode::Table => table::render(frame, area, state, table, view, theme),
+        Mode::Table => table::render(frame, area, state, table, view, ctx),
         Mode::Help => help::render(frame, area, state, table, view, theme),
     }
 }
@@ -132,6 +153,8 @@ pub fn footer(state: &State, theme: Theme, width: usize, hints: &str) -> Line<'s
     }
 
     let text = state.status.clone().unwrap_or_else(|| hints.to_owned());
+    // Clip with an ellipsis rather than letting the buffer cut mid-word.
+    let text = truncate_to_width(&text, width.saturating_sub(1));
     justify(vec![Span::raw(format!(" {text}"))], Vec::new(), width).style(theme.bar())
 }
 
@@ -165,6 +188,10 @@ pub fn thousands(n: usize) -> String {
     }
     out
 }
+
+#[cfg(test)]
+#[path = "tests.rs"]
+mod render_tests;
 
 #[cfg(test)]
 mod tests {

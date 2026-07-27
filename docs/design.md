@@ -176,7 +176,7 @@ Secondary; `t` toggles. For locating a row rather than reading one.
 ```
 
 - Column widths are sampled from the first ~1000 rows and capped, with `…`
-  elision. Recomputed on resize, not on scroll.
+  elision. Computed once at startup, since they depend only on the data.
 - Embedded newlines render as `⏎` so one row is always one line.
 - The `#` (row number) column is pinned; `H`/`L` scroll the data columns.
 - Selection is shared with the record view in both directions: `Enter` opens
@@ -345,9 +345,17 @@ Colours come from the terminal's 16 ANSI slots, not a hardcoded truecolor
 palette, so the viewer follows the user's theme. `NO_COLOR` and `--no-color`
 fall back to bold/dim/reverse attributes only.
 
-Wrapped-line layout is computed lazily and cached per `(row, field, width)`,
-invalidated on resize. Without this, a 300-line field re-wraps on every
-keypress.
+Wrapped-line layout is recomputed each frame and deliberately **not** cached.
+The concern that a long field would be expensive to re-wrap per keypress did
+not survive measurement: assembling the record body for a 60-line field takes
+about 0.7ms, comfortably inside a frame. A cache would have been complexity
+bought with nothing.
+
+Column widths are the opposite case. Sampling them costs ~86ms on a 50k-row
+file, and they were originally computed per frame, which made the table view
+unusable on large input. They depend only on the data, never on the terminal
+size, so they are computed once at startup and held in the render context —
+a resize does not invalidate them.
 
 ## Architecture
 

@@ -96,10 +96,12 @@ fn restore() -> io::Result<()> {
 
 fn run(terminal: &mut Terminal<Backend>, table: &Table, cli: &Cli, theme: Theme) -> Result<()> {
     let mut state = State::new(!cli.no_wrap);
+    // Sampling column widths is expensive on a large file, so do it once.
+    let ctx = ui::Context::new(theme, table);
 
     loop {
         let view = viewport(terminal.size()?, cli.max_height);
-        terminal.draw(|frame| ui::render(frame, &state, table, view, theme))?;
+        terminal.draw(|frame| ui::render(frame, &state, table, view, &ctx))?;
 
         let action = match event::read()? {
             Event::Key(key) => keys::action_for(key, state.mode, state.prompt.is_some()),

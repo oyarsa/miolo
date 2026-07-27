@@ -8,7 +8,7 @@ use ratatui::widgets::Paragraph;
 use crate::data::Table;
 use crate::layout::{display_width, one_line, truncate_to_width};
 use crate::state::{State, Viewport};
-use crate::ui::{Theme, footer, justify, split, thousands};
+use crate::ui::{Context, Theme, footer, justify, split, thousands};
 
 const HINTS: &str = "\u{21b5} open record  j/k row  H/L column  / search  :N jump  ? help";
 
@@ -29,14 +29,15 @@ pub fn render(
     state: &State,
     table: &Table,
     view: Viewport,
-    theme: Theme,
+    ctx: &Context,
 ) {
     let [status_area, body_area, footer_area] = split(area);
     let width = area.width as usize;
+    let theme = ctx.theme;
 
     frame.render_widget(status_bar(state, table, view, theme, width), status_area);
     frame.render_widget(
-        Paragraph::new(body(state, table, view, theme, width)),
+        Paragraph::new(body(state, table, view, ctx, width)),
         body_area,
     );
     frame.render_widget(footer(state, theme, width, HINTS), footer_area);
@@ -126,21 +127,22 @@ pub fn body(
     state: &State,
     table: &Table,
     view: Viewport,
-    theme: Theme,
+    ctx: &Context,
     width: usize,
 ) -> Vec<Line<'static>> {
-    let widths = column_widths(table);
-    let columns = visible_columns(table, &widths, state.column_offset, width);
+    let widths = &ctx.widths;
+    let theme = ctx.theme;
+    let columns = visible_columns(table, widths, state.column_offset, width);
     let gutter = gutter_width(table);
 
-    let mut lines = vec![header_row(table, &widths, &columns, gutter, theme)];
+    let mut lines = vec![header_row(table, widths, &columns, gutter, theme)];
     for offset in 0..view.table_height() {
         let index = state.table_top + offset;
         if index >= table.len() {
             break;
         }
         lines.push(data_row(
-            state, table, &widths, &columns, gutter, index, theme,
+            state, table, widths, &columns, gutter, index, theme,
         ));
     }
     lines
