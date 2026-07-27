@@ -7,8 +7,8 @@ several hundred lines of prose. `miolo` inverts the layout — one record per
 screen, fields stacked vertically — so long text gets the full width of the
 terminal and vertical space is spent on the field you care about.
 
-> **Status:** early development. The interface is specified in
-> [`docs/design.md`](docs/design.md); the implementation is not yet complete.
+> **Status:** usable. The interface is specified in
+> [`docs/design.md`](docs/design.md).
 
 ## Usage
 

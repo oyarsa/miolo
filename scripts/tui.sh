@@ -19,6 +19,7 @@ COLS="${MIOLO_COLS:-100}"
 ROWS="${MIOLO_ROWS:-30}"
 SETTLE="${MIOLO_SETTLE:-0.4}"
 FIXTURE="tests/fixtures/sample.csv"
+LAUNCHER="${TMPDIR:-/tmp}/${SESSION}-launch.sh"
 
 die() {
     echo "tui.sh: $*" >&2
@@ -49,9 +50,22 @@ cmd_start() {
     # Start on a placeholder that never exits so remain-on-exit is set before
     # the real command can die; otherwise a crash takes the pane with it and
     # there is nothing left to capture.
-    tmux new-session -d -s "$SESSION" -x "$COLS" -y "$ROWS" cat
+    # tmux keeps a row for its own status line, so a window of N rows yields a
+    # pane of N-1. Ask for one more rather than turning the status off, which
+    # does not hand the row back to an already-created pane. capture-pane reads
+    # the pane only, so the status line never reaches a snapshot.
+    tmux new-session -d -s "$SESSION" -x "$COLS" -y "$((ROWS + 1))" cat
     tmux set-option -t "$SESSION" remain-on-exit on >/dev/null
-    tmux respawn-pane -k -t "$SESSION" "$(printf '%q ' "${argv[@]}")"
+
+    # tmux runs commands through /bin/sh, which does not understand the
+    # bash-specific quoting %q emits (a tab argument becomes $'\t'). Writing a
+    # launcher keeps arguments intact whatever tmux's shell happens to be.
+    { printf '#!/usr/bin/env bash\nexec'
+      printf ' %q' "${argv[@]}"
+      printf '\n'
+    } >"$LAUNCHER"
+    chmod +x "$LAUNCHER"
+    tmux respawn-pane -k -t "$SESSION" "$LAUNCHER"
     sleep "$SETTLE"
 }
 
@@ -81,7 +95,7 @@ cmd_snap() {
 cmd_resize() {
     [ "$#" -eq 2 ] || die "resize: expected <cols> <rows>"
     require_session
-    tmux resize-window -t "$SESSION" -x "$1" -y "$2"
+    tmux resize-window -t "$SESSION" -x "$1" -y "$(($2 + 1))"
     sleep "$SETTLE"
 }
 
@@ -92,6 +106,7 @@ cmd_alive() {
 
 cmd_stop() {
     tmux kill-session -t "$SESSION" 2>/dev/null || true
+    rm -f "$LAUNCHER"
 }
 
 case "${1:-}" in

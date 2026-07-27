@@ -207,6 +207,10 @@ searches that field's content.
 to the last row. Out-of-range input is rejected with a message rather than
 clamping silently.
 
+`q` only exits from the record view. In the pager, table and help overlay it
+steps back one level, so reading a field is never one keystroke away from
+ending the session. `Ctrl-C` quits from anywhere.
+
 ## Markdown fences
 
 Fields are plain text unless they literally contain Markdown code fences:
@@ -255,7 +259,7 @@ Modal, but only lightly — most keys mean the same thing everywhere.
 | Key | Action |
 | --- | --- |
 | `?` | Help overlay |
-| `q` | Quit (from record or table); leave pager/overlay |
+| `q` | Quit (record view only); steps back from the pager, table and overlay |
 | `Esc` | Back one level; cancel a search or `:` prompt |
 | `:42` | Jump to row 42 (`:$` = last row) |
 | `/` | Search (column names; field content in the pager) |
