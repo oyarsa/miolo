@@ -217,6 +217,25 @@ fn table_scrolls_columns() {
     assert_eq!(s.column_offset, 0);
 }
 
+/// Every mode that is not the record view must act on `Back`, since that is
+/// what both `q` and `Esc` decode to outside the record view. Testing the key
+/// mapping alone missed that the table view ignored it.
+#[test]
+fn back_returns_to_the_record_from_every_mode() {
+    for entry in [Action::ToggleTable, Action::Enter, Action::ToggleHelp] {
+        let entered = apply(&start(), &[entry]);
+        assert_ne!(entered.mode, Mode::Record, "{entry:?} left the record view");
+
+        let returned = apply(&entered, &[Action::Back]);
+        assert_eq!(
+            returned.mode,
+            Mode::Record,
+            "Back did not return from {:?}",
+            entered.mode
+        );
+    }
+}
+
 #[test]
 fn table_enter_opens_the_record() {
     let s = apply(

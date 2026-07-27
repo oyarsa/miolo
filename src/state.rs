@@ -387,7 +387,7 @@ fn table_action(state: &State, table: &Table, view: Viewport, action: Action) ->
             next.column_offset = (state.column_offset + 1).min(last_column);
         }
 
-        Action::Enter | Action::ToggleTable => next.mode = Mode::Record,
+        Action::Enter | Action::ToggleTable | Action::Back => next.mode = Mode::Record,
 
         Action::NextMatch | Action::PrevMatch => {
             next = step_column(&next, table, action == Action::NextMatch);
