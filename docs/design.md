@@ -2,6 +2,9 @@
 
 A terminal viewer for CSV files whose columns contain long, multi-line text.
 
+Input formats beyond CSV — JSON, JSONL, and compressed files — are specified
+separately in [`formats.md`](formats.md).
+
 ## Problem
 
 Standard CSV tools render a grid. That fails when a single field holds several
