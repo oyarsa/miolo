@@ -6,7 +6,11 @@ rust-version = "1.88"
 description = "Terminal viewer for CSV files with long, multi-line text columns"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/oyarsa/miolo"
-publish = false
+readme = "README.md"
+keywords = ["csv", "tui", "viewer", "terminal", "pager"]
+categories = ["command-line-utilities", "text-processing"]
+# Development-only material; keep the published crate to what building needs.
+exclude = [".github/", "scripts/"]
 
 [dependencies]
 anyhow = "1.0.104"
