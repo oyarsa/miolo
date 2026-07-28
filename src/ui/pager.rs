@@ -11,7 +11,7 @@ use crate::state::{State, Viewport, pager_view};
 use crate::ui::{Theme, footer, justify, split, thousands};
 
 const HINTS: &str =
-    "j/k line  \u{2190}/\u{2192} shift  ^d/^u page  g/G top/end  / search  y yank  q back";
+    "j/k line  \u{2190}/\u{2192} shift  ^d/^u page  g/G top/end  / search  e edit  q back";
 
 /// Draw the pager.
 pub fn render(
@@ -27,7 +27,7 @@ pub fn render(
 
     frame.render_widget(status_bar(state, table, view, theme, width), status_area);
     frame.render_widget(Paragraph::new(body(state, table, view, theme)), body_area);
-    frame.render_widget(footer(state, theme, width, HINTS), footer_area);
+    frame.render_widget(footer(state, table, theme, width, HINTS), footer_area);
 }
 
 /// `file · row 42 · notes    lines 24-48/312`

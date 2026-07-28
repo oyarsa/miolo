@@ -62,6 +62,13 @@ field in place; `Enter` opens it in a full-screen pager with content search.
 `/` searches column names, `:42` jumps to a row, `t` toggles the table view,
 `y` yanks the selected field, and `?` lists every binding.
 
+`e` edits the selected field, in place in the record view or full-screen if you
+opened it from the pager. Inside the editor `Enter` inserts a newline — these
+fields are paragraphs, so that is the common operation — `^s` accepts and `Esc`
+discards, asking first. `u` undoes, and `W` writes the file back. CSV, TSV and
+PSV can be written; standard input, compressed input and JSON cannot, and the
+editor says so when it opens rather than when you try to save.
+
 ## Development
 
 Requires Rust 1.88 or later.

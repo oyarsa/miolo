@@ -5,6 +5,7 @@ mod cli;
 mod clipboard;
 mod data;
 mod decompress;
+mod edit;
 mod help;
 mod keys;
 mod layout;
@@ -28,9 +29,9 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::Size;
 
 use crate::cli::Cli;
-use crate::data::Table;
+use crate::data::{Table, write};
 use crate::layout::field_cap;
-use crate::state::{Action, Mode, State, Viewport, update};
+use crate::state::{Action, Effect, Mode, State, Viewport, update};
 use crate::ui::{Theme, record};
 
 fn main() -> Result<()> {
@@ -44,7 +45,7 @@ fn main() -> Result<()> {
     let theme = Theme::new(!cli.no_color && std::env::var_os("NO_COLOR").is_none());
 
     let mut terminal = setup().context("failed to set up the terminal")?;
-    let outcome = run(&mut terminal, &table, &cli, theme);
+    let outcome = run(&mut terminal, table, &cli, theme);
     restore().context("failed to restore the terminal")?;
     outcome
 }
@@ -94,34 +95,136 @@ fn restore() -> io::Result<()> {
     disable_raw_mode()
 }
 
-fn run(terminal: &mut Terminal<Backend>, table: &Table, cli: &Cli, theme: Theme) -> Result<()> {
+/// One committed edit, kept so it can be reversed.
+struct Change {
+    row: usize,
+    col: usize,
+    /// The text the field held before the edit.
+    text: String,
+}
+
+fn run(terminal: &mut Terminal<Backend>, mut table: Table, cli: &Cli, theme: Theme) -> Result<()> {
     let mut state = State::new(!cli.no_wrap);
     // Sampling column widths is expensive on a large file, so do it once.
-    let ctx = ui::Context::new(theme, table);
+    let mut ctx = ui::Context::new(theme, &table);
+    let mut history: Vec<Change> = Vec::new();
 
     loop {
         let view = viewport(terminal.size()?, cli.max_height);
-        terminal.draw(|frame| ui::render(frame, &state, table, view, &ctx))?;
+        terminal.draw(|frame| ui::render(frame, &state, &table, view, &ctx))?;
 
         let action = match event::read()? {
-            Event::Key(key) => keys::action_for(key, state.mode, state.prompt.is_some()),
+            Event::Key(key) => keys::action_for(key, state.mode, state.focus()),
             Event::Mouse(mouse) => keys::action_for_mouse(mouse.kind, mouse.row),
             _ => None,
         };
 
         if let Some(action) = action {
-            // Yank is the one action with a side effect, so it is performed
-            // here rather than inside the pure transition function.
-            state = if action == Action::Yank && state.prompt.is_none() {
-                yank(&state, table)
-            } else {
-                update(&state, table, view, action)
-            };
+            state = update(&state, &table, view, action);
+
+            // `update` decides what should happen; carrying it out needs the
+            // table, the clipboard and the filesystem, none of which belong in
+            // a pure function.
+            if let Some(effect) = state.effect.take() {
+                state = apply(effect, &mut table, &mut ctx, &mut history, state);
+                // Settle scrolling around whatever moved, without losing the
+                // message describing what just happened.
+                let status = state.status.take();
+                state = update(&state, &table, view, Action::Refresh);
+                state.status = status;
+            }
         }
 
         if state.quit {
             return Ok(());
         }
+    }
+}
+
+/// Carry out an effect. The only place the table is mutated.
+fn apply(
+    effect: Effect,
+    table: &mut Table,
+    ctx: &mut ui::Context,
+    history: &mut Vec<Change>,
+    state: State,
+) -> State {
+    match effect {
+        Effect::Yank => yank(&state, table),
+        Effect::Set { row, col, text } => {
+            let previous = table.set_field(row, col, text);
+            history.push(Change {
+                row,
+                col,
+                text: previous,
+            });
+            ctx.refresh_column(table, col);
+            table.dirty = true;
+            State {
+                status: Some(format!("Edited {}", table.column_name(col))),
+                ..state
+            }
+        }
+        Effect::Undo => match history.pop() {
+            Some(change) => {
+                table.set_field(change.row, change.col, change.text);
+                ctx.refresh_column(table, change.col);
+                // Still dirty even when the stack empties: a save may have
+                // happened in between, so the file no longer matches.
+                table.dirty = true;
+                State {
+                    row: change.row,
+                    field: change.col,
+                    status: Some(format!("Undid edit to {}", table.column_name(change.col))),
+                    ..state
+                }
+            }
+            None => State {
+                status: Some("Nothing to undo".to_owned()),
+                ..state
+            },
+        },
+        Effect::Save => save(table, state),
+    }
+}
+
+/// Write the table back, reporting the outcome in the footer.
+fn save(table: &mut Table, state: State) -> State {
+    if !table.dirty {
+        return State {
+            status: Some("No changes to write".to_owned()),
+            ..state
+        };
+    }
+
+    let status = match write::save(table) {
+        Ok(saved) => {
+            table.dirty = false;
+            // The file miolo just wrote is the new baseline; without this the
+            // next write would mistake its own change for someone else's.
+            table.origin.modified = saved.modified;
+            let name = saved.path.file_name().map_or_else(
+                || saved.path.display().to_string(),
+                |n| n.to_string_lossy().into(),
+            );
+            // Ragged input was squared up at load, so saying so is the only
+            // honest way to report having rewritten it.
+            if table.warnings.is_empty() {
+                format!("Wrote {name} ({} rows)", table.len())
+            } else {
+                format!(
+                    "Wrote {name} ({} rows, {} malformed rows normalised)",
+                    table.len(),
+                    table.warnings.len()
+                )
+            }
+        }
+        Err(error) => format!("Save failed: {error}"),
+    };
+
+    State {
+        status: Some(status),
+        ..state
     }
 }
 

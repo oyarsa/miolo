@@ -7,7 +7,7 @@
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Spaces a tab expands to for display.
-const TAB_WIDTH: usize = 4;
+pub const TAB_WIDTH: usize = 4;
 /// Smallest field cap, so a short terminal still shows something useful.
 pub const MIN_FIELD_HEIGHT: usize = 3;
 
@@ -42,25 +42,32 @@ pub fn display_width(s: &str) -> usize {
     UnicodeWidthStr::width(s)
 }
 
+/// Collapse `\r\n` and lone `\r` to `\n`, leaving everything else alone.
+///
+/// Split out from [`normalise`] because the editor needs one newline
+/// convention to count lines against, but must keep tabs as the single
+/// characters they are in the file.
+pub fn normalise_newlines(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut chars = raw.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\r' {
+            if chars.peek() == Some(&'\n') {
+                chars.next();
+            }
+            out.push('\n');
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 /// Normalise line endings and tabs for display.
 ///
 /// Yank deliberately does not use this — the clipboard gets the raw text.
 pub fn normalise(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
-    let mut chars = raw.chars().peekable();
-    while let Some(ch) = chars.next() {
-        match ch {
-            '\r' => {
-                if chars.peek() == Some(&'\n') {
-                    chars.next();
-                }
-                out.push('\n');
-            }
-            '\t' => out.push_str(&" ".repeat(TAB_WIDTH)),
-            _ => out.push(ch),
-        }
-    }
-    out
+    normalise_newlines(raw).replace('\t', &" ".repeat(TAB_WIDTH))
 }
 
 /// Classify a field by what it would show.
@@ -231,24 +238,48 @@ pub fn field_cap(body_height: usize, percent: u8) -> usize {
     scaled.max(MIN_FIELD_HEIGHT)
 }
 
-/// Assemble the full record body as a flat list of lines.
+/// Assemble the full record body as a flat list of lines, optionally taking
+/// one field's lines from somewhere other than the stored text.
 ///
 /// Flattening makes scrolling an index offset rather than a nest of per-field
-/// offsets, which is what keeps the record view free of nested scroll state.
-pub fn build_body(
+/// offsets, which is what keeps the record view free of nested scroll state —
+/// and what lets an inline edit scroll with everything else rather than
+/// needing a viewport of its own.
+///
+/// That somewhere else is an editor buffer. Its lines arrive already laid out
+/// rather than being wrapped here, because the caret's screen position is
+/// computed from the same partition: display wrapping may drop the whitespace
+/// it breaks on, and editing wrapping may not, so the two are not
+/// interchangeable. The edited field is never capped — you cannot type into
+/// lines that `⋯ 40 more lines` is standing in for.
+pub fn build_body_with(
     headers: &[String],
     row: &[String],
     width: usize,
     cap: usize,
     expanded: Option<usize>,
     wrap: bool,
+    edited: Option<(usize, &[String])>,
 ) -> Vec<BodyLine> {
     let mut body = Vec::new();
     for (index, name) in headers.iter().enumerate() {
         let cell = row.get(index).map_or("", String::as_str);
-        let layout = layout_field(cell, width, wrap);
-        let total = layout.lines.len();
-        let limit = if expanded == Some(index) { total } else { cap };
+        let editing = edited.filter(|(field, _)| *field == index);
+        // An edited field shows what is in the buffer, placeholders and all:
+        // typing into a field that reads `(empty)` must start from nothing,
+        // not from the word.
+        let (kind, lines) = if let Some((_, lines)) = editing {
+            (FieldKind::Text, lines.to_vec())
+        } else {
+            let layout = layout_field(cell, width, wrap);
+            (layout.kind, layout.lines)
+        };
+        let total = lines.len();
+        let limit = if expanded == Some(index) || editing.is_some() {
+            total
+        } else {
+            cap
+        };
         let shown = total.min(limit);
 
         if index > 0 {
@@ -263,12 +294,12 @@ pub fn build_body(
             role: LineRole::Header { total, shown },
             text: name.clone(),
         });
-        let role = if layout.kind == FieldKind::Text {
+        let role = if kind == FieldKind::Text {
             LineRole::Content
         } else {
             LineRole::Placeholder
         };
-        for line in layout.lines.into_iter().take(shown) {
+        for line in lines.into_iter().take(shown) {
             body.push(BodyLine {
                 field: index,
                 role: role.clone(),
@@ -317,6 +348,23 @@ pub fn scroll_to_show(body: &[BodyLine], field: usize, scroll: usize, height: us
         scroll
     };
     scroll.min(max_scroll)
+}
+
+/// Smallest scroll that keeps a single line visible.
+///
+/// Where [`scroll_to_show`] follows a whole field, this follows one line —
+/// what an editor needs, since a field can be taller than the screen and the
+/// caret is the only part of it that has to stay in view.
+pub fn scroll_to_line(line: usize, scroll: usize, total: usize, height: usize) -> usize {
+    let height = height.max(1);
+    let scroll = if line < scroll {
+        line
+    } else if line >= scroll + height {
+        line + 1 - height
+    } else {
+        scroll
+    };
+    clamp_scroll(scroll, total, height)
 }
 
 /// Clamp a scroll offset to the content, so the view never runs past the end.
@@ -411,7 +459,7 @@ mod tests {
     fn sample_body(cap: usize, expanded: Option<usize>) -> Vec<BodyLine> {
         let headers = vec!["a".to_owned(), "b".to_owned()];
         let row = vec!["one\ntwo\nthree\nfour".to_owned(), "short".to_owned()];
-        build_body(&headers, &row, 40, cap, expanded, true)
+        build_body_with(&headers, &row, 40, cap, expanded, true, None)
     }
 
     #[test]

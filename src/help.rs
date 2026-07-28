@@ -35,6 +35,10 @@ const SECTIONS: &[(&str, &[(&str, &str)])] = &[
             ("w", "Toggle wrap and truncate"),
             ("t", "Toggle record and table views"),
             ("y", "Yank the selected field"),
+            ("e", "Edit the selected field"),
+            ("u", "Undo the last edit"),
+            ("W", "Write the file back to disk"),
+            ("Q", "Quit, discarding unsaved changes"),
         ],
     ),
     (
@@ -64,6 +68,19 @@ const SECTIONS: &[(&str, &[(&str, &str)])] = &[
             ("H L", "Scroll columns"),
             ("g G", "First / last row"),
             ("Enter", "Open the row in the record view"),
+        ],
+    ),
+    (
+        "Edit",
+        &[
+            ("Enter", "Insert a newline"),
+            ("^s", "Accept the change"),
+            ("Esc", "Discard it, after confirming"),
+            ("^c", "The same; the editor never quits outright"),
+            ("\u{2190} \u{2191} \u{2193} \u{2192}", "Move the caret"),
+            ("Home", "Start of the line"),
+            ("End", "End of the line"),
+            ("^d ^u", "Move half a page"),
         ],
     ),
 ];
@@ -116,7 +133,7 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(sections, ["Global", "Record", "Pager", "Table"]);
+        assert_eq!(sections, ["Global", "Record", "Pager", "Table", "Edit"]);
     }
 
     #[test]

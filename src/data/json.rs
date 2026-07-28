@@ -96,6 +96,7 @@ fn assemble(records: Vec<Record>, name: &str) -> Table {
         rows,
         warnings,
         name: name.to_owned(),
+        ..Table::default()
     }
 }
 

@@ -8,7 +8,7 @@ use ratatui::widgets::Paragraph;
 use crate::data::Table;
 use crate::layout::{display_width, one_line, truncate_to_width};
 use crate::state::{State, Viewport};
-use crate::ui::{Context, Theme, footer, justify, split, thousands};
+use crate::ui::{Context, Theme, footer, justify, split, thousands, unsaved};
 
 const HINTS: &str = "\u{21b5} open record  j/k row  H/L column  / search  :N jump  ? help";
 
@@ -40,7 +40,7 @@ pub fn render(
         Paragraph::new(body(state, table, view, ctx, width)),
         body_area,
     );
-    frame.render_widget(footer(state, theme, width, HINTS), footer_area);
+    frame.render_widget(footer(state, table, theme, width, HINTS), footer_area);
 }
 
 /// Width of the pinned row-number column.
@@ -50,26 +50,25 @@ fn gutter_width(table: &Table) -> usize {
 
 /// Width to give each data column, sampled from the first rows.
 pub fn column_widths(table: &Table) -> Vec<usize> {
-    table
-        .headers
-        .iter()
-        .enumerate()
-        .map(|(index, header)| {
-            let widest = table
-                .rows
-                .iter()
-                .take(SAMPLE_ROWS)
-                .map(|row| {
-                    row.get(index)
-                        .map_or(0, |cell| display_width(&one_line(cell, MAX_COLUMN)))
-                })
-                .max()
-                .unwrap_or(0);
-            widest
-                .max(display_width(header))
-                .clamp(MIN_COLUMN, MAX_COLUMN)
-        })
+    (0..table.headers.len())
+        .map(|index| column_width(table, index))
         .collect()
+}
+
+/// Width to give one data column, sampled from the first rows.
+pub fn column_width(table: &Table, index: usize) -> usize {
+    let widest = table
+        .rows
+        .iter()
+        .take(SAMPLE_ROWS)
+        .map(|row| {
+            row.get(index)
+                .map_or(0, |cell| display_width(&one_line(cell, MAX_COLUMN)))
+        })
+        .max()
+        .unwrap_or(0);
+    let header = table.headers.get(index).map_or(0, |h| display_width(h));
+    widest.max(header).clamp(MIN_COLUMN, MAX_COLUMN)
 }
 
 /// Which columns fit, starting from the current horizontal offset.
@@ -117,6 +116,7 @@ pub fn status_bar(
             theme.warning(),
         ));
     }
+    right.extend(unsaved(table, theme));
     right.push(Span::raw("   TABLE "));
 
     justify(left, right, width).style(theme.bar())

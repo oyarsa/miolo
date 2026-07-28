@@ -7,14 +7,13 @@ use ratatui::widgets::Paragraph;
 
 use crate::data::Table;
 use crate::layout::{BodyLine, LineRole};
-use crate::state::{State, Viewport, body_for};
-use crate::ui::{Theme, footer, justify, split, thousands};
+use crate::state::{State, Viewport, body_for, caret_in_body};
+use crate::ui::{Theme, edit, footer, justify, split, thousands, unsaved};
 
 /// Width of the selection gutter, including the trailing space.
 pub const GUTTER: usize = 2;
 
-const HINTS: &str =
-    "h/l row  j/k field  ^d/^u scroll  z expand  \u{21b5} open  / search  ? help  q quit";
+const HINTS: &str = "h/l row  j/k field  z expand  \u{21b5} open  e edit  / search  ? help  q quit";
 
 /// Draw the record view.
 pub fn render(
@@ -33,7 +32,24 @@ pub fn render(
         Paragraph::new(body(state, table, view, theme, width)),
         body_area,
     );
-    frame.render_widget(footer(state, theme, width, HINTS), footer_area);
+
+    // The same view draws an inline edit, so the chrome follows what is
+    // actually happening in it rather than what mode is nominally active.
+    match &state.editing {
+        Some(editing) => {
+            frame.render_widget(edit::footer(state, editing, theme, width), footer_area);
+            if let Some((line, column)) = caret_in_body(state, table, view) {
+                edit::place_cursor(
+                    frame,
+                    body_area,
+                    editing,
+                    line.saturating_sub(state.scroll),
+                    column + GUTTER,
+                );
+            }
+        }
+        None => frame.render_widget(footer(state, table, theme, width, HINTS), footer_area),
+    }
 }
 
 /// The top bar: file name, position, load warnings and current mode.
@@ -57,7 +73,16 @@ pub fn status_bar(state: &State, table: &Table, theme: Theme, width: usize) -> L
             theme.warning(),
         ));
     }
-    right.push(Span::raw("   RECORD "));
+    right.extend(unsaved(table, theme));
+    match &state.editing {
+        Some(editing) => {
+            if editing.modified() {
+                right.push(Span::styled("   \u{2022}modified", theme.marker()));
+            }
+            right.push(Span::raw("   EDIT "));
+        }
+        None => right.push(Span::raw("   RECORD ")),
+    }
 
     justify(left, right, width).style(theme.bar())
 }

@@ -239,3 +239,198 @@ fn an_empty_table_renders_without_rows() {
     let lines = frame(&State::new(true), &empty, 40, 6);
     assert!(lines[0].contains("no rows"));
 }
+
+// -- editor ---------------------------------------------------------------
+
+/// The fixture with somewhere to write back to, so the editor opens without
+/// reporting why it could not save.
+fn writable() -> Table {
+    let mut table = table();
+    table.origin.path = Some(std::path::PathBuf::from("/tmp/test.csv"));
+    table
+}
+
+#[test]
+fn the_editor_shows_the_field_and_how_to_leave_it() {
+    let table = writable();
+    let state = apply(
+        &[Action::Down, Action::Down, Action::BeginEdit],
+        &table,
+        60,
+        10,
+    );
+    let lines = frame(&state, &table, 60, 10);
+
+    assert!(lines[0].starts_with(" test.csv"), "file name in the bar");
+    assert!(lines[0].ends_with("EDIT"), "mode in the bar");
+    assert!(lines[9].contains("^s save"), "hints in the footer");
+    assert!(lines[9].contains("Esc cancel"));
+
+    // The point of editing in place: the record is still around the field.
+    assert!(
+        lines.iter().any(|l| l.contains("customer")),
+        "the neighbouring fields are still on screen"
+    );
+    let notes = lines
+        .iter()
+        .position(|l| l.contains("notes"))
+        .expect("the edited field's header");
+    assert_eq!(lines[notes + 1], "\u{258c} first line");
+    assert_eq!(lines[notes + 2], "\u{258c} second line");
+}
+
+#[test]
+fn editing_from_the_pager_keeps_the_full_screen_surface() {
+    let table = writable();
+    let state = apply(
+        &[Action::Down, Action::Down, Action::Enter, Action::BeginEdit],
+        &table,
+        60,
+        10,
+    );
+    let lines = frame(&state, &table, 60, 10);
+
+    assert!(lines[0].contains("notes"), "column being edited");
+    assert!(lines[0].contains("line 1/4"), "position within the field");
+    assert!(lines[0].ends_with("EDIT"));
+    assert_eq!(
+        lines[1], "first line",
+        "no gutter: the field has the screen"
+    );
+    assert!(
+        !lines.iter().any(|l| l.contains("customer")),
+        "a field read full screen is edited full screen"
+    );
+}
+
+#[test]
+fn typing_shows_up_and_marks_the_field_modified() {
+    let table = writable();
+    let state = apply(
+        &[
+            Action::BeginEdit,
+            Action::EditInsert('4'),
+            Action::EditInsert('2'),
+        ],
+        &table,
+        60,
+        10,
+    );
+    let lines = frame(&state, &table, 60, 10);
+
+    assert_eq!(
+        lines[2], "\u{258c} 421",
+        "typed at the caret, ahead of the old text"
+    );
+    assert!(lines[0].contains("modified"), "the bar says so");
+}
+
+#[test]
+fn an_inline_edit_wraps_within_the_record_body() {
+    let table = writable();
+    // Ten cells of body once the gutter and the caret's column are taken, so
+    // "first line" no longer fits on one row.
+    let state = apply(
+        &[Action::Down, Action::Down, Action::BeginEdit],
+        &table,
+        12,
+        14,
+    );
+    let lines = frame(&state, &table, 12, 14);
+
+    assert!(
+        lines.iter().all(|l| crate::layout::display_width(l) <= 12),
+        "nothing overruns the frame"
+    );
+    assert!(lines.iter().any(|l| l.trim_end() == "\u{258c} first"));
+    assert!(lines.iter().any(|l| l.trim_end() == "\u{258c} line"));
+}
+
+#[test]
+fn editing_lifts_the_cap_the_record_view_applies() {
+    let table = writable();
+    // The notes field is four lines against a three-line cap.
+    let capped = apply(&[Action::Down, Action::Down], &table, 60, 11);
+    assert!(
+        frame(&capped, &table, 60, 11)
+            .iter()
+            .any(|l| l.contains("more lines")),
+        "clamped while reading"
+    );
+
+    let editing = apply(
+        &[Action::Down, Action::Down, Action::BeginEdit],
+        &table,
+        60,
+        11,
+    );
+    let lines = frame(&editing, &table, 60, 11);
+    assert!(
+        !lines.iter().any(|l| l.contains("more lines")),
+        "and whole while editing"
+    );
+    assert!(lines.iter().any(|l| l.contains("fourth line")));
+}
+
+#[test]
+fn a_source_that_cannot_be_saved_says_so_where_it_will_be_read() {
+    // The fixture has no path, standing in for piped input. The reason has to
+    // reach the footer: opening is the last moment the user can walk away
+    // without having typed anything.
+    let table = table();
+    let state = apply(&[Action::BeginEdit], &table, 60, 10);
+    let lines = frame(&state, &table, 60, 10);
+
+    assert!(lines[9].contains("cannot save"), "{}", lines[9]);
+    assert!(
+        !lines[9].contains("^s save"),
+        "the reason displaces the hints"
+    );
+}
+
+#[test]
+fn the_discard_question_replaces_the_hints() {
+    let table = writable();
+    let state = apply(
+        &[
+            Action::BeginEdit,
+            Action::EditInsert('x'),
+            Action::EditCancel,
+        ],
+        &table,
+        60,
+        10,
+    );
+    let lines = frame(&state, &table, 60, 10);
+    assert!(lines[9].contains("Discard changes"), "{}", lines[9]);
+    assert!(lines[9].contains("y / n"), "says how to answer");
+}
+
+#[test]
+fn the_full_screen_editor_wraps_within_the_screen() {
+    let table = writable();
+    let state = apply(
+        &[Action::Down, Action::Down, Action::Enter, Action::BeginEdit],
+        &table,
+        9,
+        10,
+    );
+    let lines = frame(&state, &table, 9, 10);
+
+    // Eight cells of text, with the ninth column left free for the caret.
+    // The break keeps the word whole and the trailing space with it.
+    assert_eq!(lines[1], "first");
+    assert_eq!(lines[2], "line");
+    assert!(
+        lines.iter().all(|l| l.chars().count() <= 9),
+        "nothing overruns the frame"
+    );
+}
+
+#[test]
+fn an_unsaved_table_says_so_in_the_record_bar() {
+    let mut table = writable();
+    table.dirty = true;
+    let lines = frame(&State::new(true), &table, 60, 12);
+    assert!(lines[0].contains("unsaved"), "{}", lines[0]);
+}

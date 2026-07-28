@@ -16,6 +16,9 @@ In scope:
 
 Explicit non-goals:
 
+- Writing JSON or JSONL back. Loading is lossy in a way writing cannot undo —
+  see [Values](#values) — so a save is refused rather than performed
+  destructively. Delimited formats round-trip and can be written.
 - YAML, Parquet, xlsx. YAML has no real tabular use; Parquet drags in the Arrow
   stack and a columnar loader; xlsx needs sheet selection. None earns its
   complexity here.
@@ -114,6 +117,14 @@ not become `1`, a large integer loses nothing, and a value with more precision
 than an `f64` could hold survives intact. The one normalisation is exponent
 notation, where the marker is lowercased and given an explicit sign — `1e3` and
 `1E3` both render as `1e+3`. The value is unchanged.
+
+This rendering is one-way, which is why JSON cannot be written back. Every
+value has become its display text, `null` is indistinguishable from an empty
+string, and a key absent from one record has been materialised as an empty
+field by the union above. Re-encoding the table would turn numbers, nulls and
+nested objects into strings and add keys the record never had — a silent
+corruption of the file, so the editor says up front that it cannot save, and
+`W` refuses.
 
 Nested values pretty-print and then behave like any other tall field, which is
 exactly what the record view exists for. The pager tints them as code, detected

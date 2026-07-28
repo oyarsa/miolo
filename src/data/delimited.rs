@@ -88,6 +88,7 @@ pub fn parse(data: &[u8], delimiter: u8, name: &str) -> Result<Table, csv::Error
         rows,
         warnings,
         name: name.to_owned(),
+        ..Table::default()
     })
 }
 

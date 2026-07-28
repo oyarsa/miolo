@@ -6,15 +6,17 @@
 
 mod delimited;
 mod json;
+pub mod write;
 
 use std::fs::File;
 use std::io::{self, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 
 use crate::decompress::decompress;
-use crate::source::{Format, FormatArg, detect_compression, resolve_format};
+use crate::source::{Compression, Format, FormatArg, detect_compression, resolve_format};
 
 /// Why a record needed reconciling, or could not be used.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +54,32 @@ pub struct LoadWarning {
     pub kind: WarningKind,
 }
 
+/// Where a table came from, and therefore where it can be written back to.
+///
+/// Kept beside the data rather than in the view state because it describes the
+/// document, not what is on screen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Origin {
+    /// The file the table was read from; `None` for standard input.
+    pub path: Option<PathBuf>,
+    pub format: Format,
+    pub compression: Compression,
+    /// Modification time at load, so a save can refuse to clobber a file that
+    /// changed underneath it.
+    pub modified: Option<SystemTime>,
+}
+
+impl Default for Origin {
+    fn default() -> Self {
+        Self {
+            path: None,
+            format: Format::Delimited(b','),
+            compression: Compression::None,
+            modified: None,
+        }
+    }
+}
+
 /// A whole input held in memory.
 #[derive(Debug, Clone, Default)]
 pub struct Table {
@@ -60,6 +88,9 @@ pub struct Table {
     pub warnings: Vec<LoadWarning>,
     /// Display name for the status bar.
     pub name: String,
+    pub origin: Origin,
+    /// Set by an edit, cleared by a successful save.
+    pub dirty: bool,
 }
 
 impl Table {
@@ -83,6 +114,28 @@ impl Table {
             .get(row)
             .and_then(|r| r.get(col))
             .map_or("", String::as_str)
+    }
+
+    /// Column name, or a positional stand-in when the index is out of range.
+    pub fn column_name(&self, col: usize) -> String {
+        self.headers
+            .get(col)
+            .cloned()
+            .unwrap_or_else(|| format!("column {}", col + 1))
+    }
+
+    /// Replace one field, returning the text that was there.
+    ///
+    /// Rows are padded to the header width at load, so a short row here means
+    /// a caller went out of range; it is grown rather than silently ignored.
+    pub fn set_field(&mut self, row: usize, col: usize, text: String) -> String {
+        let Some(cells) = self.rows.get_mut(row) else {
+            return String::new();
+        };
+        if col >= cells.len() {
+            cells.resize(col + 1, String::new());
+        }
+        std::mem::replace(&mut cells[col], text)
     }
 }
 
@@ -118,7 +171,21 @@ pub fn load(
         decompress(data, compression).with_context(|| format!("could not decompress {name}"))?;
 
     let format = resolve_format(path, requested, delimiter);
-    parse(&data, format, &name)
+    let mut table = parse(&data, format, &name)?;
+    table.origin = Origin {
+        path: path.filter(|p| *p != Path::new("-")).map(Path::to_path_buf),
+        format,
+        compression,
+        modified: path.and_then(modified_time),
+    };
+    Ok(table)
+}
+
+/// Modification time of a file, or `None` if it cannot be read.
+pub fn modified_time(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
 }
 
 /// Slurp a file, or standard input when `path` is `None` or `-`.
