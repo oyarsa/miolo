@@ -14,7 +14,7 @@ mod source;
 mod state;
 mod ui;
 
-use std::io::{self, IsTerminal, Stdout};
+use std::io::{self, Stdout};
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
@@ -36,12 +36,9 @@ use crate::ui::{Theme, record};
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    if cli.file.is_none() && io::stdin().is_terminal() {
-        // Nothing piped and no path given: there is nothing to show.
-        Cli::parse_from(["miolo", "--help"]);
-        return Ok(());
-    }
-
+    // No path means standard input, as for most command-line tools. Reading
+    // happens before the terminal is put into raw mode, so a pipe that is
+    // still producing simply delays startup.
     let delimiter = cli.delimiter.map(delimiter_byte).transpose()?;
     let table = data::load(cli.file.as_deref(), cli.format, delimiter)?;
     let theme = Theme::new(!cli.no_color && std::env::var_os("NO_COLOR").is_none());

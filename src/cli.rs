@@ -28,7 +28,7 @@ fn long_version() -> &'static str {
 )]
 #[command(version, long_version = long_version())]
 pub struct Cli {
-    /// File to view. Use "-", or omit it with a pipe, to read stdin
+    /// File to view. Omit it, or pass "-", to read standard input
     pub file: Option<PathBuf>,
 
     /// Input format [default: inferred from the file extension]

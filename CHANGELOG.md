@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Omitting the file argument now always reads standard input, as most
+  command-line tools do, rather than printing help when nothing is piped
 - `--delimiter` no longer defaults eagerly; it is only applied when given, so
   it can refine a format rather than override one
 

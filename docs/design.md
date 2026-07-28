@@ -326,7 +326,7 @@ layout.
 miolo [OPTIONS] [FILE]
 
 Arguments:
-  [FILE]  CSV file to view. Use "-", or omit it with a pipe, to read stdin.
+  [FILE]  File to view. Omit it, or pass "-", to read standard input.
 
 Options:
   -d, --delimiter <CHAR>  Field delimiter [default: ,]
@@ -337,7 +337,10 @@ Options:
   -V, --version           Print version
 ```
 
-With no argument and no pipe on stdin, print help and exit.
+A missing path means standard input, as for most command-line tools. Input is
+read to EOF before the terminal is put into raw mode, so a slow pipe only
+delays startup. With no path and nothing piped, that means waiting on the
+terminal until `Ctrl-D` — the same as `cat` with no arguments.
 
 Reading from stdin means stdin is not the terminal, so the event loop reopens
 `/dev/tty` for keyboard input.

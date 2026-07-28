@@ -17,7 +17,7 @@ terminal and vertical space is spent on the field you care about.
 miolo [OPTIONS] [FILE]
 
 Arguments:
-  [FILE]  File to view. Use "-", or omit it with a pipe, to read stdin.
+  [FILE]  File to view. Omit it, or pass "-", to read standard input.
 
 Options:
   -f, --format <FORMAT>   Input format [default: inferred from the extension]
