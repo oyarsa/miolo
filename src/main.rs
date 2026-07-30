@@ -15,10 +15,10 @@ mod source;
 mod state;
 mod ui;
 
-use std::io::{self, Stdout};
+use std::io::{self, IsTerminal, Stdout};
 
 use anyhow::{Context, Result, bail};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -37,12 +37,25 @@ use crate::ui::{Theme, record};
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // No file and nothing piped: there is nothing to view, and reading the
+    // terminal itself would sit on a blank screen until Ctrl-D looking like a
+    // hang. Say what the program is instead. An explicit `-` still reads the
+    // terminal, because that is what asking for standard input means.
+    if cli.file.is_none() && io::stdin().is_terminal() {
+        Cli::command().print_help()?;
+        return Ok(());
+    }
+
     // No path means standard input, as for most command-line tools. Reading
     // happens before the terminal is put into raw mode, so a pipe that is
     // still producing simply delays startup.
     let delimiter = cli.delimiter.map(delimiter_byte).transpose()?;
     let table = data::load(cli.file.as_deref(), cli.format, delimiter)?;
-    let theme = Theme::new(!cli.no_color && std::env::var_os("NO_COLOR").is_none());
+    let theme = Theme::new(Theme::wanted(
+        cli.no_color,
+        std::env::var_os("NO_COLOR").is_some(),
+        std::env::var("TERM").ok().as_deref(),
+    ));
 
     let mut terminal = setup().context("failed to set up the terminal")?;
     let outcome = run(&mut terminal, table, &cli, theme);

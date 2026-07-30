@@ -32,6 +32,10 @@ Options:
 
 For separated values the first row is always the header.
 
+Input can be piped (`cat data.csv | miolo`). Run with no file and nothing
+piped, `miolo` prints this help rather than sitting on a blank screen waiting
+for `Ctrl-D`; pass `-` if you really do want it to read the terminal.
+
 ## Formats
 
 The format comes from the file extension — `.csv`, `.tsv`, `.tab`, `.psv`,
@@ -77,6 +81,12 @@ Requires Rust 1.88 or later.
 just fix        # format, autofix clippy warnings, run tests
 just check-all  # lint and test without modifying anything
 ```
+
+## Links
+
+- Source and issues: <https://github.com/oyarsa/miolo>
+- Design notes: [`docs/design.md`](docs/design.md) and
+  [`docs/formats.md`](docs/formats.md)
 
 ## Licence
 

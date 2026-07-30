@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `TERM=dumb` disables colour, alongside `NO_COLOR` and `--no-color`
+- The repository URL appears in `--help` and `--version`, so somewhere to read
+  more and somewhere to report problems are one flag away
+
+### Changed
+
+- Run with no file and nothing piped, `miolo` now prints its help and exits
+  instead of reading the terminal until `Ctrl-D` — a viewer waiting on an
+  empty screen is indistinguishable from a hung one. Piped input is unaffected,
+  and an explicit `-` still reads the terminal
+
+### Fixed
+
+- A save that failed part-way — running out of disk, say — could leave its
+  staging file behind
+
 ## [0.3.0] - 2026-07-29
 
 ### Added

@@ -30,6 +30,16 @@ impl Theme {
         Self { color }
     }
 
+    /// Whether colour is wanted, from the flag and the environment.
+    ///
+    /// `NO_COLOR` is the user declining it. `TERM=dumb` is the terminal saying
+    /// it has none to give, which amounts to the same answer here but for a
+    /// different reason: crossterm writes ANSI without consulting terminfo, so
+    /// this is the only place that can decline on the terminal's behalf.
+    pub fn wanted(flag: bool, no_color: bool, term: Option<&str>) -> bool {
+        !flag && !no_color && term != Some("dumb")
+    }
+
     fn tinted(self, color: Color) -> Style {
         if self.color {
             Style::default().fg(color)
@@ -261,6 +271,19 @@ mod tests {
 
     fn rendered(line: &Line<'_>) -> String {
         line.spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    #[test]
+    fn colour_is_on_unless_something_declines_it() {
+        assert!(Theme::wanted(false, false, Some("xterm-256color")));
+        assert!(Theme::wanted(false, false, None), "TERM may be unset");
+
+        assert!(!Theme::wanted(true, false, Some("xterm")), "--no-color");
+        assert!(!Theme::wanted(false, true, Some("xterm")), "NO_COLOR");
+        assert!(
+            !Theme::wanted(false, false, Some("dumb")),
+            "a dumb terminal has no colour to give"
+        );
     }
 
     #[test]

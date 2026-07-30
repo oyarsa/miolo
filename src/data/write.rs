@@ -111,19 +111,28 @@ pub fn save(table: &Table) -> Result<Saved> {
 ///
 /// A rename within a directory is atomic, so an interrupted save leaves either
 /// the old file or the new one — never a half-written mixture of the two.
+///
+/// Every way of failing takes the staging file with it, including a write that
+/// ran out of disk part-way. What no process can tidy up after is being killed
+/// outright; a staging file left by that is inert, and the next save overwrites
+/// it, so it is not worth deleting files at startup to chase.
 fn write_atomically(path: &Path, bytes: &[u8]) -> Result<()> {
     let temp = temp_path(path);
-    fs::write(&temp, bytes)?;
+    let staged = stage(&temp, path, bytes);
+    if staged.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    staged
+}
 
+/// Write the staging file, give it the target's permissions, and move it over.
+fn stage(temp: &Path, path: &Path, bytes: &[u8]) -> Result<()> {
+    fs::write(temp, bytes)?;
     // Match the original's permissions; a fresh temp file gets the umask's.
     if let Ok(meta) = fs::metadata(path) {
-        let _ = fs::set_permissions(&temp, meta.permissions());
+        let _ = fs::set_permissions(temp, meta.permissions());
     }
-
-    if let Err(error) = fs::rename(&temp, path) {
-        let _ = fs::remove_file(&temp);
-        return Err(error.into());
-    }
+    fs::rename(temp, path)?;
     Ok(())
 }
 
@@ -300,6 +309,22 @@ mod tests {
             !temp_path(&scratch.0).exists(),
             "the staging file must be renamed away"
         );
+    }
+
+    #[test]
+    fn a_failed_write_takes_its_staging_file_with_it() {
+        // A directory in place of the target: the rename cannot succeed, which
+        // stands in for any other way the move can fail.
+        let dir = std::env::temp_dir().join(format!("miolo-{}-blocked.csv", std::process::id()));
+        fs::create_dir_all(&dir).expect("could not create the blocking directory");
+
+        let error = write_atomically(&dir, b"a,b\n").expect_err("should not overwrite a directory");
+        assert!(
+            !temp_path(&dir).exists(),
+            "a failed save must not leave its staging file: {error}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

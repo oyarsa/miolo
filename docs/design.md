@@ -370,6 +370,11 @@ Writing goes through a hidden sibling temporary file and a rename, which is
 atomic within a directory, so an interrupted save leaves either the old file or
 the new one and never a mixture. Permissions are copied from the original.
 
+Every way of failing takes the staging file with it, including a write that
+runs out of disk part-way. The one case no process can tidy up after is being
+killed outright — and a staging file left by that is inert, overwritten by the
+next save, so miolo does not go deleting files at startup to chase it.
+
 A write reflects the **table**, not the file that was read. Short rows were
 padded at load and surplus columns were given `+1` names, so ragged input is
 written back square, and quoting is normalised to what the `csv` crate emits.
@@ -504,8 +509,14 @@ Options:
 
 A missing path means standard input, as for most command-line tools. Input is
 read to EOF before the terminal is put into raw mode, so a slow pipe only
-delays startup. With no path and nothing piped, that means waiting on the
-terminal until `Ctrl-D` — the same as `cat` with no arguments.
+delays startup.
+
+With no path **and** standard input still attached to the terminal there is
+nothing to view, so `miolo` prints its help and exits 0 rather than reading the
+terminal. `cat` with no arguments waits for `Ctrl-D`, but `cat` echoes what you
+type, so it is visibly alive; a viewer would sit on a blank screen looking
+hung. An explicit `-` still reads the terminal, because that is what asking for
+standard input means.
 
 Reading from stdin means stdin is not the terminal, so the event loop reopens
 `/dev/tty` for keyboard input.
@@ -513,8 +524,12 @@ Reading from stdin means stdin is not the terminal, so the event loop reopens
 ## Rendering
 
 Colours come from the terminal's 16 ANSI slots, not a hardcoded truecolor
-palette, so the viewer follows the user's theme. `NO_COLOR` and `--no-color`
-fall back to bold/dim/reverse attributes only.
+palette, so the viewer follows the user's theme. `NO_COLOR`, `--no-color` and
+`TERM=dumb` all fall back to bold/dim/reverse attributes only.
+
+The first two are the user declining colour; the third is the terminal saying
+it has none to give. crossterm writes ANSI without consulting terminfo, so
+that check is the only thing standing in for the terminal's own opinion.
 
 Wrapped-line layout is recomputed each frame and deliberately **not** cached.
 The concern that a long field would be expensive to re-wrap per keypress did
