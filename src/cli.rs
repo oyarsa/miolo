@@ -12,7 +12,7 @@ use crate::source::FormatArg;
 fn long_version() -> &'static str {
     concat!(
         env!("CARGO_PKG_VERSION"),
-        " (2026-07-29)\n", // Update date when releasing
+        " (2026-07-30)\n", // Update date when releasing
         env!("CARGO_PKG_REPOSITORY"),
         "\n\n",
         "Copyright (C) 2026 Italo Silva\n",
